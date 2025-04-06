@@ -48,22 +48,26 @@ function App() {
       const place = AVAILABLE_PLACES.find((place) => place.id === id);
       return [place, ...prevPickedPlaces];
     });
-    let newData = [id, ...storageIds]
+    let storageIdss = JSON.parse(localStorage.getItem('selectedIds')) || []
+    let newData = [...storageIdss]
     
-    if(storageIds.indexOf(id) === -1){
+    if(newData.indexOf(id) === -1){
+      newData = [id, ...newData]
       localStorage.setItem('selectedIds', JSON.stringify(newData))
     }
-    
   }
 
   function handleRemovePlace() {
     setPickedPlaces((prevPickedPlaces) =>
       prevPickedPlaces.filter((place) => place.id !== selectedPlace.current)
     );
-   
-    localStorage.setItem('selectedIds', JSON.stringify(storageIds.filter(item=>{
-      item.id !== selectedPlace.current
-    })))
+
+    let storageIdss = JSON.parse(localStorage.getItem('selectedIds')) || []
+    let newData = [...storageIdss]
+    
+    localStorage.setItem('selectedIds', JSON.stringify(newData.filter(item=>
+      item !== selectedPlace.current
+    )))
     setShowModal(false)
   }
 

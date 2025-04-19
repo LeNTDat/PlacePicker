@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import Places from './components/Places.jsx';
 import { AVAILABLE_PLACES } from './data.js';
@@ -6,10 +6,11 @@ import Modal from './components/Modal.jsx';
 import DeleteConfirmation from './components/DeleteConfirmation.jsx';
 import logoImg from './assets/logo.png';
 import { sortPlacesByDistance } from './loc.js';
-
+import { updateUserPlaces, fetchAvailablePlaces } from './http.js'
+import AvailablePlaces from './components/AvailablePlaces.jsx';
 const storageIds = JSON.parse(localStorage.getItem('selectedIds')) || [];
-const pickedPlaces2 = AVAILABLE_PLACES.filter(item=>{
-   return storageIds.find(id => item.id === id)
+const pickedPlaces2 = AVAILABLE_PLACES.filter(item => {
+  return storageIds.find(id => item.id === id)
 })
 
 function App() {
@@ -19,17 +20,16 @@ function App() {
   const [showModal, setShowModal] = useState(false);
 
   useEffect(()=>{
-    navigator.geolocation.getCurrentPosition((position)=>{
-      const sortPlaces = sortPlacesByDistance(
-        AVAILABLE_PLACES, 
-        position.coords.latitude, 
-        position.coords.longitude
-      )
-      setAvailablePlaces(sortPlaces)
-    });
+    const fetchingPickedPlaces = async ()=>{
+      const places = await fetchAvailablePlaces('user-places');
+      setPickedPlaces(places)
+    }
+
+    fetchingPickedPlaces();
   },[])
 
   
+
 
   function handleStartRemovePlace(id) {
     setShowModal(true)
@@ -40,36 +40,33 @@ function App() {
     setShowModal(false)
   }
 
-  function handleSelectPlace(id) {
+  async function handleSelectPlace(selectedPlaces) {
     setPickedPlaces((prevPickedPlaces) => {
-      if (prevPickedPlaces.some((place) => place.id === id)) {
+      if (!prevPickedPlaces) {
+        prevPickedPlaces = [];
+      }
+      if (prevPickedPlaces.some((place) => place.id === selectedPlaces.id)) {
         return prevPickedPlaces;
       }
-      const place = AVAILABLE_PLACES.find((place) => place.id === id);
-      return [place, ...prevPickedPlaces];
+      return [selectedPlaces, ...prevPickedPlaces];
     });
-    let storageIdss = JSON.parse(localStorage.getItem('selectedIds')) || []
-    let newData = [...storageIdss]
-    
-    if(newData.indexOf(id) === -1){
-      newData = [id, ...newData]
-      localStorage.setItem('selectedIds', JSON.stringify(newData))
+
+    try{
+      await updateUserPlaces([selectedPlaces, ...pickedPlaces])
+    }catch(err){
+      setPickedPlaces(pickedPlaces);
     }
   }
-
-  function handleRemovePlace() {
+  const handleRemovePlace = useCallback(async function handleRemovePlace() {
     setPickedPlaces((prevPickedPlaces) =>
-      prevPickedPlaces.filter((place) => place.id !== selectedPlace.current)
+      prevPickedPlaces.filter((place) => place.id !== selectedPlace.current.id)
     );
 
-    let storageIdss = JSON.parse(localStorage.getItem('selectedIds')) || []
-    let newData = [...storageIdss]
-    
-    localStorage.setItem('selectedIds', JSON.stringify(newData.filter(item=>
-      item !== selectedPlace.current
-    )))
+    await updateUserPlaces(pickedPlaces.filter(place =>place.id !== selectedPlace.current.id))
+
     setShowModal(false)
-  }
+  },[])
+  
 
   return (
     <>
@@ -95,10 +92,7 @@ function App() {
           places={pickedPlaces}
           onSelectPlace={handleStartRemovePlace}
         />
-        <Places
-          title="Available Places"
-          places={availablePlaces}
-          fallbackText={"Sorting places by distance,,,,"}
+        <AvailablePlaces
           onSelectPlace={handleSelectPlace}
         />
       </main>
